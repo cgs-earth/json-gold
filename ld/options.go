@@ -16,6 +16,18 @@ package ld
 
 type Embed string
 
+// RDFQuadProvenance contains source JSON-LD line numbers for an RDF quad.
+type RDFQuadProvenance struct {
+	SubjectLine   int
+	PredicateLine int
+	ObjectLine    int
+	GraphLine     int
+}
+
+// RDFQuadProvenanceCallback is called during ToRDF for RDF quads whose source
+// JSON-LD line numbers are known.
+type RDFQuadProvenanceCallback func(quad *Quad, provenance RDFQuadProvenance)
+
 const (
 	JsonLd_1_0       = "json-ld-1.0"              //nolint:stylecheck
 	JsonLd_1_1       = "json-ld-1.1"              //nolint:stylecheck
@@ -54,9 +66,10 @@ type JsonLdOptions struct { //nolint:stylecheck
 
 	// RDF conversion options: http://www.w3.org/TR/json-ld-api/#serialize-rdf-as-json-ld-algorithm
 
-	UseRdfType            bool
-	UseNativeTypes        bool
-	ProduceGeneralizedRdf bool
+	UseRdfType                bool
+	UseNativeTypes            bool
+	ProduceGeneralizedRdf     bool
+	RDFQuadProvenanceCallback RDFQuadProvenanceCallback
 
 	// The following properties aren't in the spec
 
@@ -71,50 +84,52 @@ type JsonLdOptions struct { //nolint:stylecheck
 // NewJsonLdOptions creates and returns new instance of JsonLdOptions with the given base.
 func NewJsonLdOptions(base string) *JsonLdOptions { //nolint:stylecheck
 	return &JsonLdOptions{
-		Base:                  base,
-		CompactArrays:         true,
-		ProcessingMode:        JsonLd_1_1,
-		DocumentLoader:        NewDefaultDocumentLoader(nil),
-		Embed:                 EmbedLast,
-		Explicit:              false,
-		RequireAll:            true,
-		FrameDefault:          false,
-		OmitDefault:           false,
-		OmitGraph:             false,
-		UseRdfType:            false,
-		UseNativeTypes:        false,
-		ProduceGeneralizedRdf: false,
-		InputFormat:           "",
-		Format:                "",
-		Algorithm:             AlgorithmURGNA2012,
-		UseNamespaces:         false,
-		OutputForm:            "",
-		SafeMode:              false,
+		Base:                      base,
+		CompactArrays:             true,
+		ProcessingMode:            JsonLd_1_1,
+		DocumentLoader:            NewDefaultDocumentLoader(nil),
+		Embed:                     EmbedLast,
+		Explicit:                  false,
+		RequireAll:                true,
+		FrameDefault:              false,
+		OmitDefault:               false,
+		OmitGraph:                 false,
+		UseRdfType:                false,
+		UseNativeTypes:            false,
+		ProduceGeneralizedRdf:     false,
+		InputFormat:               "",
+		Format:                    "",
+		Algorithm:                 AlgorithmURGNA2012,
+		UseNamespaces:             false,
+		OutputForm:                "",
+		SafeMode:                  false,
+		RDFQuadProvenanceCallback: nil,
 	}
 }
 
 // Copy creates a deep copy of JsonLdOptions object.
 func (opt *JsonLdOptions) Copy() *JsonLdOptions {
 	return &JsonLdOptions{
-		Base:                  opt.Base,
-		CompactArrays:         opt.CompactArrays,
-		ExpandContext:         opt.ExpandContext,
-		ProcessingMode:        opt.ProcessingMode,
-		DocumentLoader:        opt.DocumentLoader,
-		Embed:                 opt.Embed,
-		Explicit:              opt.Explicit,
-		RequireAll:            opt.RequireAll,
-		FrameDefault:          opt.FrameDefault,
-		OmitDefault:           opt.OmitDefault,
-		OmitGraph:             opt.OmitGraph,
-		UseRdfType:            opt.UseRdfType,
-		UseNativeTypes:        opt.UseNativeTypes,
-		ProduceGeneralizedRdf: opt.ProduceGeneralizedRdf,
-		InputFormat:           opt.InputFormat,
-		Format:                opt.Format,
-		Algorithm:             opt.Algorithm,
-		UseNamespaces:         opt.UseNamespaces,
-		OutputForm:            opt.OutputForm,
-		SafeMode:              opt.SafeMode,
+		Base:                      opt.Base,
+		CompactArrays:             opt.CompactArrays,
+		ExpandContext:             opt.ExpandContext,
+		ProcessingMode:            opt.ProcessingMode,
+		DocumentLoader:            opt.DocumentLoader,
+		Embed:                     opt.Embed,
+		Explicit:                  opt.Explicit,
+		RequireAll:                opt.RequireAll,
+		FrameDefault:              opt.FrameDefault,
+		OmitDefault:               opt.OmitDefault,
+		OmitGraph:                 opt.OmitGraph,
+		UseRdfType:                opt.UseRdfType,
+		UseNativeTypes:            opt.UseNativeTypes,
+		ProduceGeneralizedRdf:     opt.ProduceGeneralizedRdf,
+		InputFormat:               opt.InputFormat,
+		Format:                    opt.Format,
+		Algorithm:                 opt.Algorithm,
+		UseNamespaces:             opt.UseNamespaces,
+		OutputForm:                opt.OutputForm,
+		SafeMode:                  opt.SafeMode,
+		RDFQuadProvenanceCallback: opt.RDFQuadProvenanceCallback,
 	}
 }

@@ -120,6 +120,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 		graph[id.(string)] = nodeVal
 	}
 	node := nodeVal.(map[string]interface{})
+	setSourceLine(node, sourceLine(elem))
 
 	if _, isMap := activeSubject.(map[string]interface{}); isMap {
 		// if subject is a hash, then we're processing a reverse-property relationship.
@@ -128,6 +129,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 		ref := map[string]interface{}{
 			"@id": id,
 		}
+		setSourceLine(ref, sourceLine(elem))
 		if list == nil {
 			AddValue(subjectNode, activeProperty, ref, true, false, false, false)
 		} else {
@@ -137,6 +139,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 
 	if typeVal, hasType := elem["@type"]; hasType {
 		AddValue(node, "@type", typeVal, true, false, false, false)
+		setSourcePropertyLine(node, "@type", sourcePropertyLine(elem, "@type"))
 	}
 
 	if elemIdx, hasIndex := elem["@index"]; hasIndex {
@@ -184,6 +187,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 		}
 
 		value := elem[property]
+		propertyLine := sourcePropertyLine(elem, property)
 
 		// if property is a bnode, assign it a new id
 		if strings.HasPrefix(property, "_:") {
@@ -193,6 +197,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 		if _, found := node[property]; !found {
 			node[property] = []interface{}{}
 		}
+		setSourcePropertyLine(node, property, propertyLine)
 		if _, err := api.GenerateNodeMap(value, graphMap, activeGraph, issuer, id.(string), property, nil); err != nil {
 			return nil, err
 		}

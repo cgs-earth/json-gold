@@ -15,7 +15,9 @@
 package ld
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -499,6 +501,17 @@ func (jldp *JsonLdProcessor) ToRDF(input interface{}, opts *JsonLdOptions) (inte
 		opts = opts.Copy()
 	}
 
+	// If a provenance callback is defined,
+	// add source line information to the input data
+	// Otherwise no source line information is added
+	if opts.RDFQuadProvenanceCallback != nil {
+		var err error
+		input, err = applyLineMetadata(input)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	expandedInput, err := jldp.expand(input, opts)
 	if err != nil {
 		return nil, err
@@ -537,6 +550,24 @@ func (jldp *JsonLdProcessor) ToRDF(input interface{}, opts *JsonLdOptions) (inte
 	}
 
 	return dataset, nil
+}
+
+// Given json-ld input, add source line information to the input data
+func applyLineMetadata(jsonldInput any) (any, error) {
+	switch v := jsonldInput.(type) {
+	case []byte:
+		return documentFromReaderWithSourceLines(bytes.NewReader(v))
+	case io.Reader:
+		return documentFromReaderWithSourceLines(v)
+	// String case could potentially be dropped since ToRDF by default
+	// seems to expect an io.Reader
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+			return documentFromReaderWithSourceLines(strings.NewReader(v))
+		}
+	}
+	return jsonldInput, nil
 }
 
 // Normalize RDF dataset normalization on the given input. The input is
