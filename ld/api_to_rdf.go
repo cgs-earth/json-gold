@@ -32,7 +32,7 @@ func (api *JsonLdApi) ToRDF(input interface{}, opts *JsonLdOptions) (*RDFDataset
 			continue
 		}
 		graph := graphVal.(map[string]interface{})
-		dataset.GraphToRDF(graphName, graph, issuer, opts.ProduceGeneralizedRdf)
+		dataset.graphToRDF(graphName, graph, issuer, opts.ProduceGeneralizedRdf, opts.RDFQuadProvenanceCallback, api.sourceLines)
 	}
 
 	return dataset, nil

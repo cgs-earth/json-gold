@@ -305,6 +305,7 @@ func (api *JsonLdApi) Expand(activeCtx *Context, activeProperty string, element 
 		}
 		// 13)
 		if resultMap != nil {
+			api.sourceLines.SetLine(resultMap, api.sourceLines.Line(elem))
 			return resultMap, nil
 		} else {
 			return nil, nil
@@ -661,6 +662,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 			// 7.4.12)
 			if expandedValue != nil {
 				resultMap[expandedProperty] = expandedValue
+				api.sourceLines.SetPropertyLine(resultMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 			}
 			// 7.4.13)
 			continue
@@ -779,6 +781,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 		if expandedValue == nil {
 			continue
 		}
+		api.sourceLines.SetLineOnValue(expandedValue, api.sourceLines.PropertyLine(elem, key))
 		// 7.9)
 		if termCtx.HasContainerMapping(key, "@list") {
 			expandedValueMap, isMap := expandedValue.(map[string]interface{})
@@ -839,6 +842,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				} else {
 					expandedPropertyList = make([]interface{}, 0)
 				}
+				api.sourceLines.SetPropertyLine(reverseMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 
 				switch v := item.(type) {
 				case map[string]interface{}:
@@ -874,6 +878,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				expandedPropertyList = append(expandedPropertyList, expandedValue)
 			}
 			resultMap[expandedProperty] = expandedPropertyList
+			api.sourceLines.SetPropertyLine(resultMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 		}
 	}
 

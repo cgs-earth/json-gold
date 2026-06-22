@@ -226,6 +226,12 @@ var nilIRI = NewIRI(RDFNil)
 // GraphToRDF creates an array of RDF triples for the given graph.
 func (ds *RDFDataset) GraphToRDF(graphName string, graph map[string]interface{}, issuer *IdentifierIssuer,
 	produceGeneralizedRdf bool) {
+	// call private method here to avoid breaking public API
+	ds.graphToRDF(graphName, graph, issuer, produceGeneralizedRdf, nil, nil)
+}
+
+func (ds *RDFDataset) graphToRDF(graphName string, graph map[string]interface{}, issuer *IdentifierIssuer,
+	produceGeneralizedRdf bool, callback RDFQuadProvenanceCallback, sourceLines *sourceLineStore) {
 	// 4.2)
 	triples := make([]*Quad, 0)
 	// 4.3)
@@ -235,7 +241,9 @@ func (ds *RDFDataset) GraphToRDF(graphName string, graph map[string]interface{},
 		}
 
 		node := graph[id].(map[string]interface{})
+		subjectLine := sourceLines.Line(node)
 		for _, property := range GetOrderedKeys(node) {
+			predicateLine := sourceLines.PropertyLine(node, property)
 			var values []interface{}
 			// 4.3.2.1)
 			if property == "@type" {
@@ -272,9 +280,18 @@ func (ds *RDFDataset) GraphToRDF(graphName string, graph map[string]interface{},
 
 			for _, item := range values {
 				var object Node
-				object, triples = objectToRDF(item, issuer, graphName, triples)
+				object, triples = objectToRDF(item, issuer, graphName, triples, callback, sourceLines)
 				if object != nil {
-					triples = append(triples, NewQuad(subject, predicate, object, graphName))
+					quad := NewQuad(subject, predicate, object, graphName)
+					triples = append(triples, quad)
+					if callback != nil {
+						applyProvCallback(callback, quad, sourceLineProvenance(
+							subjectLine,
+							predicateLine,
+							sourceLines.Line(item),
+							0,
+						))
+					}
 				}
 			}
 		}
