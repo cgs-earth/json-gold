@@ -52,7 +52,7 @@
 
 - Copy the [original library](https://github.com/kazarena/json-gold) under the following terms:
                                                                      
-  - @piprate team will be the maintainer of the new library (github.com/piprate/json-gold)
+  - @piprate team will be the maintainer of the new library (github.com/cgs-earth/json-gold)
   - The original repo (github.com/kazarena/json-gold) will remain available
   - Interfaces of the new library will be preserved, but may deviate in future versions
   - Licensing will not change

@@ -17,7 +17,7 @@ package ld_test
 import (
 	"testing"
 
-	. "github.com/piprate/json-gold/ld"
+	. "github.com/cgs-earth/json-gold/ld"
 	"github.com/stretchr/testify/assert"
 )
 

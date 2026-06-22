@@ -15,7 +15,7 @@ install:
       cd $HOME/gopath/src/github.com
       mv $(dirname $TRAVIS_REPO_SLUG) piprate
       cd piprate/json-gold
-      export TRAVIS_BUILD_DIR=$HOME/gopath/src/github.com/piprate/json-gold
+      export TRAVIS_BUILD_DIR=$HOME/gopath/src/github.com/cgs-earth/json-gold
       pwd
     fi
   - go get -v -t ./...

@@ -3,13 +3,13 @@
 all: lint test
 
 vet:
-	go vet github.com/piprate/json-gold/...
+	go vet github.com/cgs-earth/json-gold/...
 
 test: vet
-	go test github.com/piprate/json-gold/...
+	go test github.com/cgs-earth/json-gold/...
 
 test-cov: vet
-	go test github.com/piprate/json-gold/... -race -coverprofile=coverage.txt -covermode=atomic
+	go test github.com/cgs-earth/json-gold/... -race -coverprofile=coverage.txt -covermode=atomic
 
 lint:
 	golangci-lint run

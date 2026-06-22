@@ -1,7 +1,7 @@
 # JSON-goLD
 
-[![GoDoc](https://godoc.org/github.com/piprate/json-gold?status.svg)](https://pkg.go.dev/github.com/piprate/json-gold)
-[![ci](https://github.com/piprate/json-gold/actions/workflows/ci.yml/badge.svg)](https://github.com/piprate/json-gold/actions/workflows/ci.yml)
+[![GoDoc](https://godoc.org/github.com/cgs-earth/json-gold?status.svg)](https://pkg.go.dev/github.com/cgs-earth/json-gold)
+[![ci](https://github.com/cgs-earth/json-gold/actions/workflows/ci.yml/badge.svg)](https://github.com/cgs-earth/json-gold/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/piprate/json-gold/branch/master/graph/badge.svg?token=JvEEDMmppm)](https://codecov.io/gh/piprate/json-gold)
 
 This library is an implementation of the [JSON-LD 1.1](http://json-ld.org/) specification in Go.
@@ -291,4 +291,4 @@ This implementation was influenced by [Ruby JSON-LD reader/writer](https://githu
 
 The [original library](https://github.com/kazarena/json-gold) was written by Stan Nazarenko
 ([@kazarena](https://github.com/kazarena)). See the full list of contributors
-[here](https://github.com/piprate/json-gold/blob/master/CONTRIBUTORS.md).
+[here](https://github.com/cgs-earth/json-gold/blob/master/CONTRIBUTORS.md).

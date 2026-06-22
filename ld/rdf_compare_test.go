@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	. "github.com/piprate/json-gold/ld"
+	. "github.com/cgs-earth/json-gold/ld"
 )
 
 // Perm calls f with each permutation of a.

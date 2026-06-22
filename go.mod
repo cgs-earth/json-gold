@@ -1,4 +1,4 @@
-module github.com/piprate/json-gold
+module github.com/cgs-earth/json-gold
 
 go 1.21
 

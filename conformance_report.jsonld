@@ -36,7 +36,7 @@
     },
     "xsd": "http://www.w3.org/2001/XMLSchema#"
   },
-  "@id": "https://github.com/piprate/json-gold",
+  "@id": "https://github.com/cgs-earth/json-gold",
   "@type": [
     "doap:Project",
     "earl:TestSubject",
@@ -58,12 +58,12 @@
     "foaf:homepage": "https://github.com/kazarena",
     "foaf:name": "Stan Nazarenko"
   },
-  "doap:homepage": "https://github.com/piprate/json-gold",
-  "doap:license": "https://github.com/piprate/json-gold/blob/master/LICENSE",
+  "doap:homepage": "https://github.com/cgs-earth/json-gold",
+  "doap:license": "https://github.com/cgs-earth/json-gold/blob/master/LICENSE",
   "doap:name": "JSON-goLD",
   "doap:programming-language": "Go",
   "doap:release": {
-    "@id": "https://github.com/piprate/json-gold/tree/v0.3.0",
+    "@id": "https://github.com/cgs-earth/json-gold/tree/v0.3.0",
     "@type": "doap:Version",
     "doap:created": {
       "@type": "xsd:date",

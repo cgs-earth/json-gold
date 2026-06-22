@@ -18,8 +18,9 @@
 package main
 
 import (
-	"github.com/piprate/json-gold/ld"
 	"log"
+
+	"github.com/cgs-earth/json-gold/ld"
 )
 
 func main() {
