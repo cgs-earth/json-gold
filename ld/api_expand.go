@@ -214,10 +214,6 @@ func (api *JsonLdApi) Expand(activeCtx *Context, activeProperty string, element 
 			}
 			hasDisallowedKeys := false
 			for key := range resultMap {
-				// Skip the magic key which is used to store source line metadata
-				if isSourceLineMetadataKey(key) {
-					continue
-				}
 				if _, containsKey := allowedKeys[key]; !containsKey {
 					hasDisallowedKeys = true
 					break
@@ -276,7 +272,7 @@ func (api *JsonLdApi) Expand(activeCtx *Context, activeProperty string, element 
 				if _, hasIndex := resultMap["@index"]; hasIndex {
 					maxSize = 2
 				}
-				if lenWithoutProvMetadata(resultMap) > maxSize {
+				if len(resultMap) > maxSize {
 					return nil, NewJsonLdError(InvalidSetOrListObject,
 						"@set or @list may only contain @index")
 				}
@@ -292,7 +288,7 @@ func (api *JsonLdApi) Expand(activeCtx *Context, activeProperty string, element 
 			}
 		}
 		// 11)
-		if _, hasLanguage := resultMap["@language"]; hasLanguage && lenWithoutProvMetadata(resultMap) == 1 {
+		if _, hasLanguage := resultMap["@language"]; hasLanguage && len(resultMap) == 1 {
 			resultMap = nil
 		}
 		// 12)
@@ -301,15 +297,15 @@ func (api *JsonLdApi) Expand(activeCtx *Context, activeProperty string, element 
 			_, hasValue := resultMap["@value"]
 			_, hasList := resultMap["@list"]
 			_, hasID := resultMap["@id"]
-			if resultMap != nil && (lenWithoutProvMetadata(resultMap) == 0 || hasValue || hasList) {
+			if resultMap != nil && (len(resultMap) == 0 || hasValue || hasList) {
 				resultMap = nil
-			} else if resultMap != nil && !frameExpansion && hasID && lenWithoutProvMetadata(resultMap) == 1 { // 12.2)
+			} else if resultMap != nil && !frameExpansion && hasID && len(resultMap) == 1 { // 12.2)
 				resultMap = nil
 			}
 		}
 		// 13)
 		if resultMap != nil {
-			setSourceLine(resultMap, sourceLine(elem))
+			api.sourceLines.SetLine(resultMap, api.sourceLines.Line(elem))
 			return resultMap, nil
 		} else {
 			return nil, nil
@@ -396,7 +392,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				} else if frameExpansion {
 					switch v := value.(type) {
 					case map[string]interface{}:
-						if lenWithoutProvMetadata(v) != 0 {
+						if len(v) != 0 {
 							return NewJsonLdError(InvalidIDValue, "@id value must be a an empty object for framing")
 						}
 						expandedValue = []interface{}{v}
@@ -468,7 +464,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 						expandedValue = append(Arrayify(resultMap[expandedProperty]), expandedValue)
 					}
 				case map[string]interface{}:
-					if lenWithoutProvMetadata(v) != 0 {
+					if len(v) != 0 {
 						return NewJsonLdError(InvalidTypeValue,
 							"@type value must be a an empty object for framing")
 					}
@@ -609,7 +605,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				} else {
 					maxSize = 0
 				}
-				if lenWithoutProvMetadata(expandedValueMap) > maxSize {
+				if len(expandedValueMap) > maxSize {
 					var reverseMap map[string]interface{}
 					if reverseValue, containsReverse := resultMap["@reverse"]; containsReverse {
 						// 7.4.11.3.2)
@@ -622,9 +618,6 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 
 					// 7.4.11.3.3)
 					for property, propertyValue := range expandedValueMap {
-						if isSourceLineMetadataKey(property) {
-							continue
-						}
 						if property == "@reverse" {
 							continue
 						}
@@ -669,7 +662,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 			// 7.4.12)
 			if expandedValue != nil {
 				resultMap[expandedProperty] = expandedValue
-				setSourcePropertyLine(resultMap, expandedProperty, sourcePropertyLine(elem, key))
+				api.sourceLines.SetPropertyLine(resultMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 			}
 			// 7.4.13)
 			continue
@@ -788,7 +781,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 		if expandedValue == nil {
 			continue
 		}
-		setSourceLineOnValue(expandedValue, sourcePropertyLine(elem, key))
+		api.sourceLines.SetLineOnValue(expandedValue, api.sourceLines.PropertyLine(elem, key))
 		// 7.9)
 		if termCtx.HasContainerMapping(key, "@list") {
 			expandedValueMap, isMap := expandedValue.(map[string]interface{})
@@ -849,7 +842,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				} else {
 					expandedPropertyList = make([]interface{}, 0)
 				}
-				setSourcePropertyLine(reverseMap, expandedProperty, sourcePropertyLine(elem, key))
+				api.sourceLines.SetPropertyLine(reverseMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 
 				switch v := item.(type) {
 				case map[string]interface{}:
@@ -885,7 +878,7 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 				expandedPropertyList = append(expandedPropertyList, expandedValue)
 			}
 			resultMap[expandedProperty] = expandedPropertyList
-			setSourcePropertyLine(resultMap, expandedProperty, sourcePropertyLine(elem, key))
+			api.sourceLines.SetPropertyLine(resultMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 		}
 	}
 

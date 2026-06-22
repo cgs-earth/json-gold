@@ -118,6 +118,10 @@ func (jldp *JsonLdProcessor) Expand(input interface{}, opts *JsonLdOptions) ([]i
 }
 
 func (jldp *JsonLdProcessor) expand(input interface{}, opts *JsonLdOptions) ([]interface{}, error) {
+	return jldp.expandWithAPI(input, opts, NewJsonLdApi())
+}
+
+func (jldp *JsonLdProcessor) expandWithAPI(input interface{}, opts *JsonLdOptions, api *JsonLdApi) ([]interface{}, error) {
 
 	// 1)
 	// TODO: look into promises
@@ -177,7 +181,6 @@ func (jldp *JsonLdProcessor) expand(input interface{}, opts *JsonLdOptions) ([]i
 	}
 
 	// 6)
-	api := NewJsonLdApi()
 	expanded, err := api.Expand(activeCtx, "", input, opts, false, nil)
 	if err != nil {
 		return nil, err
@@ -504,20 +507,22 @@ func (jldp *JsonLdProcessor) ToRDF(input interface{}, opts *JsonLdOptions) (inte
 	// If a provenance callback is defined,
 	// add source line information to the input data
 	// Otherwise no source line information is added
+	api := NewJsonLdApi()
 	if opts.RDFQuadProvenanceCallback != nil {
 		var err error
-		input, err = applyLineMetadata(input)
+		var sourceLines *sourceLineStore
+		input, sourceLines, err = applyLineMetadata(input)
 		if err != nil {
 			return nil, err
 		}
+		api = newJsonLdApiWithSourceLines(sourceLines)
 	}
 
-	expandedInput, err := jldp.expand(input, opts)
+	expandedInput, err := jldp.expandWithAPI(input, opts, api)
 	if err != nil {
 		return nil, err
 	}
 
-	api := NewJsonLdApi()
 	dataset, err := api.ToRDF(expandedInput, opts)
 	if err != nil {
 		return nil, err
@@ -553,7 +558,7 @@ func (jldp *JsonLdProcessor) ToRDF(input interface{}, opts *JsonLdOptions) (inte
 }
 
 // Given json-ld input, add source line information to the input data
-func applyLineMetadata(jsonldInput any) (any, error) {
+func applyLineMetadata(jsonldInput any) (any, *sourceLineStore, error) {
 	switch v := jsonldInput.(type) {
 	case []byte:
 		return documentFromReaderWithSourceLines(bytes.NewReader(v))
@@ -567,7 +572,7 @@ func applyLineMetadata(jsonldInput any) (any, error) {
 			return documentFromReaderWithSourceLines(strings.NewReader(v))
 		}
 	}
-	return jsonldInput, nil
+	return jsonldInput, nil, nil
 }
 
 // Normalize RDF dataset normalization on the given input. The input is

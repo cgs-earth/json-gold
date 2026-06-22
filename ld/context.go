@@ -464,9 +464,6 @@ func (c *Context) parse(localContext interface{}, remoteContexts []string, parsi
 		}
 
 		for key := range contextMap {
-			if isSourceLineMetadataKey(key) {
-				continue
-			}
 			if _, skip := nonTermDefKeys[key]; !skip {
 				if err := result.createTermDefinition(contextMap, key, defined, overrideProtected); err != nil {
 					return nil, err
@@ -675,9 +672,6 @@ func (c *Context) createTermDefinition(context map[string]interface{}, term stri
 		vmap, isMap := value.(map[string]interface{})
 		var hasAllowedKeysOnly = true
 		for k := range vmap {
-			if isSourceLineMetadataKey(k) {
-				continue
-			}
 			if k != "@container" && k != "@protected" {
 				hasAllowedKeysOnly = false
 				break
@@ -722,9 +716,6 @@ func (c *Context) createTermDefinition(context map[string]interface{}, term stri
 		validKeys["@protected"] = true
 	}
 	for k := range val {
-		if isSourceLineMetadataKey(k) {
-			continue
-		}
 		if _, isValid := validKeys[k]; !isValid {
 			return NewJsonLdError(InvalidTermDefinition, fmt.Sprintf("a term definition must not contain %s", k))
 		}

@@ -20,9 +20,16 @@ package ld
 //
 // Warning: using this interface directly is highly discouraged. Please use JsonLdProcessor instead.
 type JsonLdApi struct { //nolint:stylecheck
+	sourceLines *sourceLineStore
 }
 
 // NewJsonLdApi creates a new instance of JsonLdApi.
 func NewJsonLdApi() *JsonLdApi { //nolint:stylecheck
 	return &JsonLdApi{}
+}
+
+func newJsonLdApiWithSourceLines(sourceLines *sourceLineStore) *JsonLdApi {
+	return &JsonLdApi{
+		sourceLines: sourceLines,
+	}
 }

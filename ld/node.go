@@ -235,7 +235,7 @@ func RdfToObject(n Node, useNativeTypes bool) (map[string]interface{}, error) {
 
 // objectToRDF converts a JSON-LD value object to an RDF literal or a JSON-LD string or
 // node object to an RDF resource.
-func objectToRDF(item interface{}, issuer *IdentifierIssuer, graphName string, triples []*Quad, callback RDFQuadProvenanceCallback) (Node, []*Quad) {
+func objectToRDF(item interface{}, issuer *IdentifierIssuer, graphName string, triples []*Quad, callback RDFQuadProvenanceCallback, sourceLines *sourceLineStore) (Node, []*Quad) {
 	// convert value object to RDF
 	if IsValue(item) {
 		itemMap := item.(map[string]interface{})
@@ -330,7 +330,7 @@ func objectToRDF(item interface{}, issuer *IdentifierIssuer, graphName string, t
 		// if item is a list object, initialize list_results as an empty array,
 		// and object to the result of the List Conversion algorithm, passing
 		// the value associated with the @list key from item and list_results.
-		return parseList(item.(map[string]interface{})["@list"].([]interface{}), issuer, graphName, triples, callback, sourceLine(item))
+		return parseList(item.(map[string]interface{})["@list"].([]interface{}), issuer, graphName, triples, callback, sourceLines, sourceLines.Line(item))
 	} else {
 		// convert string/node object to RDF
 		var id string
@@ -351,7 +351,7 @@ func objectToRDF(item interface{}, issuer *IdentifierIssuer, graphName string, t
 	}
 }
 
-func parseList(list []interface{}, issuer *IdentifierIssuer, graphName string, triples []*Quad, callback RDFQuadProvenanceCallback, listLine int) (Node, []*Quad) {
+func parseList(list []interface{}, issuer *IdentifierIssuer, graphName string, triples []*Quad, callback RDFQuadProvenanceCallback, sourceLines *sourceLineStore, listLine int) (Node, []*Quad) {
 
 	var res Node
 	var last interface{}
@@ -367,13 +367,13 @@ func parseList(list []interface{}, issuer *IdentifierIssuer, graphName string, t
 
 	var obj Node
 	for i := 0; i < len(list)-1; i++ {
-		obj, triples = objectToRDF(list[i], issuer, graphName, triples, callback)
+		obj, triples = objectToRDF(list[i], issuer, graphName, triples, callback, sourceLines)
 		next := NewBlankNode(issuer.GetId(""))
 		firstQuad := NewQuad(subj, first, obj, graphName)
 		restQuad := NewQuad(subj, rest, next, graphName)
 		triples = append(triples, firstQuad, restQuad)
 		if callback != nil {
-			applyProvCallback(callback, firstQuad, sourceLineProvenance(listLine, listLine, sourceLineWithFallback(list[i], listLine), 0))
+			applyProvCallback(callback, firstQuad, sourceLineProvenance(listLine, listLine, sourceLines.LineWithFallback(list[i], listLine), 0))
 			applyProvCallback(callback, restQuad, sourceLineProvenance(listLine, listLine, listLine, 0))
 		}
 		subj = next
@@ -381,11 +381,11 @@ func parseList(list []interface{}, issuer *IdentifierIssuer, graphName string, t
 
 	// tail of list
 	if last != nil {
-		obj, triples = objectToRDF(last, issuer, graphName, triples, callback)
+		obj, triples = objectToRDF(last, issuer, graphName, triples, callback, sourceLines)
 		firstQuad := NewQuad(subj, first, obj, graphName)
 		restQuad := NewQuad(subj, rest, nilIRI, graphName)
 		triples = append(triples, firstQuad, restQuad)
-		applyProvCallback(callback, firstQuad, sourceLineProvenance(listLine, listLine, sourceLineWithFallback(last, listLine), 0))
+		applyProvCallback(callback, firstQuad, sourceLineProvenance(listLine, listLine, sourceLines.LineWithFallback(last, listLine), 0))
 		applyProvCallback(callback, restQuad, sourceLineProvenance(listLine, listLine, listLine, 0))
 	}
 

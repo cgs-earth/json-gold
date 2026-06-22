@@ -82,3 +82,30 @@ func TestToRDFWithNoCallback(t *testing.T) {
 	_, err := proc.ToRDF(reader, opts)
 	require.NoError(t, err)
 }
+
+func TestApplyLineMetadataDoesNotMutateJSONObjects(t *testing.T) {
+	doc := `{
+  "@context": {
+    "name": "http://schema.org/name",
+    "knows": {"@id": "http://schema.org/knows", "@type": "@id"}
+  },
+  "@id": "http://example.com/alice",
+  "name": "Alice",
+  "knows": {
+    "name": {"@value": "Bob"},
+    "@id": "http://example.com/bob"
+  }
+}`
+
+	parsed, sourceLines, err := applyLineMetadata(strings.NewReader(doc))
+	require.NoError(t, err)
+	require.NotNil(t, sourceLines)
+
+	root := parsed.(map[string]any)
+	require.Len(t, root, 4)
+	require.Len(t, root["@context"].(map[string]any), 2)
+	require.Len(t, root["knows"].(map[string]any), 2)
+
+	assert.Equal(t, 1, sourceLines.Line(root))
+	assert.Equal(t, 7, sourceLines.PropertyLine(root, "name"))
+}

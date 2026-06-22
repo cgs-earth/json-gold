@@ -173,7 +173,7 @@ func IsSubject(v interface{}) bool {
 	_, containsList := vMap["@list"]
 	_, containsID := vMap["@id"]
 	if isMap && !(containsValue || containsSet || containsList) {
-		return lenWithoutProvMetadata(vMap) > 1 || !containsID
+		return len(vMap) > 1 || !containsID
 	}
 	return false
 }
@@ -189,7 +189,7 @@ func IsSubjectReference(v interface{}) bool {
 	// 2. It has a single key: @id.
 	vMap, isMap := v.(map[string]interface{})
 	_, containsID := vMap["@id"]
-	return isMap && lenWithoutProvMetadata(vMap) == 1 && containsID
+	return isMap && len(vMap) == 1 && containsID
 }
 
 // IsList returns true if the given value is a @list.
@@ -211,7 +211,7 @@ func IsGraph(v interface{}) bool {
 	hasOtherKeys := false
 	if isMap {
 		for k := range vMap {
-			if k != "@id" && k != "@index" && k != "@graph" && !isSourceLineMetadataKey(k) {
+			if k != "@id" && k != "@index" && k != "@graph" {
 				hasOtherKeys = true
 				break
 			}
@@ -265,7 +265,7 @@ func IsBlankNodeValue(v interface{}) bool {
 			_, containsValue := vMap["@value"]
 			_, containsSet := vMap["@set"]
 			_, containsList := vMap["@list"]
-			return lenWithoutProvMetadata(vMap) == 0 || !containsValue || containsSet || containsList
+			return len(vMap) == 0 || !containsValue || containsSet || containsList
 		}
 	}
 	return false
@@ -306,7 +306,7 @@ func inArray(v interface{}, array []interface{}) bool {
 
 func isEmptyObject(v interface{}) bool {
 	vMap, isMap := v.(map[string]interface{})
-	return isMap && lenWithoutProvMetadata(vMap) == 0
+	return isMap && len(vMap) == 0
 }
 
 // RemovePreserve removes the @preserve keywords as the last step of the framing algorithm.
@@ -560,9 +560,6 @@ func CloneDocument(value interface{}) interface{} {
 func GetKeys[T any](m map[string]T) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
-		if isSourceLineMetadataKey(key) {
-			continue
-		}
 		keys = append(keys, key)
 	}
 

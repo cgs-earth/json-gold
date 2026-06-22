@@ -18,22 +18,39 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"reflect"
 	"sort"
 )
-
-// sourceLineMetadataKey is a magic key used to store source line metadata
-// in JSON-LD.
-const sourceLineMetadataKey = "\x00json-gold:source-line"
 
 type sourceLineMetadata struct {
 	line       int
 	properties map[string]int
 }
 
-func documentFromReaderWithSourceLines(r io.Reader) (any, error) {
+// sourceLineStore tracks source line numbers for JSON-LD objects and
+// properties. It maps metadata by each map's runtime identity (uintptr) because
+// map[string]any is not comparable and cannot be used directly as a map key,
+// Also because hashing contents would be unstable as JSON-LD processing mutates
+// maps. Keeping this as a sidecar also avoids adding extra magic fields to an
+// existing JSON-LD map.
+type sourceLineStore struct {
+	objects map[uintptr]*sourceLineMetadata
+}
+
+// newSourceLineStore creates the sidecar store used to keep source line data out
+// of decoded JSON-LD maps while they move through expansion and RDF conversion.
+func newSourceLineStore() *sourceLineStore {
+	return &sourceLineStore{
+		objects: make(map[uintptr]*sourceLineMetadata),
+	}
+}
+
+// documentFromReaderWithSourceLines parses JSON-LD input and records object and
+// property line numbers for later RDFQuadProvenance callbacks.
+func documentFromReaderWithSourceLines(r io.Reader) (any, *sourceLineStore, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, NewJsonLdError(LoadingDocumentFailed, err)
+		return nil, nil, NewJsonLdError(LoadingDocumentFailed, err)
 	}
 
 	newlineOffsets := make([]int64, 0)
@@ -44,14 +61,17 @@ func documentFromReaderWithSourceLines(r io.Reader) (any, error) {
 	}
 
 	dec := json.NewDecoder(bytes.NewReader(data))
-	document, err := decodeValueWithSourceLines(dec, newlineOffsets)
+	store := newSourceLineStore()
+	document, err := decodeValueWithSourceLines(dec, newlineOffsets, store)
 	if err != nil {
-		return nil, NewJsonLdError(LoadingDocumentFailed, err)
+		return nil, nil, NewJsonLdError(LoadingDocumentFailed, err)
 	}
-	return document, nil
+	return document, store, nil
 }
 
-func decodeValueWithSourceLines(dec *json.Decoder, newlineOffsets []int64) (any, error) {
+// decodeValueWithSourceLines mirrors json.Decoder's normal recursive decoding
+// while attaching line metadata to each object and object property encountered.
+func decodeValueWithSourceLines(dec *json.Decoder, newlineOffsets []int64, store *sourceLineStore) (any, error) {
 	tok, err := dec.Token()
 	if err != nil {
 		return nil, err
@@ -63,10 +83,7 @@ func decodeValueWithSourceLines(dec *json.Decoder, newlineOffsets []int64) (any,
 		case '{':
 			line := lineForOffset(dec.InputOffset()-1, newlineOffsets)
 			m := make(map[string]any)
-			metadata := &sourceLineMetadata{
-				line:       line,
-				properties: make(map[string]int),
-			}
+			store.SetLine(m, line)
 			for dec.More() {
 				keyTok, err := dec.Token()
 				if err != nil {
@@ -74,22 +91,21 @@ func decodeValueWithSourceLines(dec *json.Decoder, newlineOffsets []int64) (any,
 				}
 				key := keyTok.(string)
 				propertyLine := lineForOffset(dec.InputOffset(), newlineOffsets)
-				val, err := decodeValueWithSourceLines(dec, newlineOffsets)
+				val, err := decodeValueWithSourceLines(dec, newlineOffsets, store)
 				if err != nil {
 					return nil, err
 				}
 				m[key] = val
-				metadata.properties[key] = propertyLine
+				store.SetPropertyLine(m, key, propertyLine)
 			}
 			if _, err := dec.Token(); err != nil {
 				return nil, err
 			}
-			m[sourceLineMetadataKey] = metadata
 			return m, nil
 		case '[':
 			a := make([]any, 0)
 			for dec.More() {
-				val, err := decodeValueWithSourceLines(dec, newlineOffsets)
+				val, err := decodeValueWithSourceLines(dec, newlineOffsets, store)
 				if err != nil {
 					return nil, err
 				}
@@ -105,64 +121,98 @@ func decodeValueWithSourceLines(dec *json.Decoder, newlineOffsets []int64) (any,
 	return tok, nil
 }
 
+// lineForOffset converts a decoder byte offset into a 1-based source line using
+// the precomputed newline positions from the original input.
 func lineForOffset(offset int64, newlineOffsets []int64) int {
 	return sort.Search(len(newlineOffsets), func(i int) bool {
 		return newlineOffsets[i] >= offset
 	}) + 1
 }
 
-func sourceLine(v any) int {
+// Line returns the source line for a JSON-LD object map, or 0 when the line is
+// unknown or provenance tracking is disabled.
+func (s *sourceLineStore) Line(v any) int {
+	if s == nil {
+		return 0
+	}
 	if m, ok := v.(map[string]any); ok {
-		if metadata := getSourceLineMetadata(m); metadata != nil {
+		if metadata := s.get(m); metadata != nil {
 			return metadata.line
 		}
 	}
 	return 0
 }
 
-func sourceLineWithFallback(v any, fallback int) int {
-	if line := sourceLine(v); line > 0 {
+// LineWithFallback keeps generated RDF provenance populated when a transformed
+// value has no direct object line but its containing construct does.
+func (s *sourceLineStore) LineWithFallback(v any, fallback int) int {
+	if line := s.Line(v); line > 0 {
 		return line
 	}
 	return fallback
 }
 
-func setSourceLine(m map[string]any, line int) {
+// SetLine records the line where a JSON-LD object begins so later processing can
+// attribute RDF subjects or object values back to the original document.
+func (s *sourceLineStore) SetLine(m map[string]any, line int) {
+	if s == nil {
+		return
+	}
 	if line > 0 {
-		metadata := ensureSourceLineMetadata(m)
+		metadata := s.ensure(m)
 		metadata.line = line
 	}
 }
 
-func setSourceLineIfMissing(m map[string]any, line int) {
-	if line > 0 && sourceLine(m) == 0 {
-		setSourceLine(m, line)
+// SetLineIfMissing preserves the earliest known source location for maps copied
+// or synthesized during expansion without overwriting more precise metadata.
+func (s *sourceLineStore) SetLineIfMissing(m map[string]any, line int) {
+	if s == nil {
+		return
+	}
+	if line > 0 && s.Line(m) == 0 {
+		s.SetLine(m, line)
 	}
 }
 
-func setSourceLineOnValue(v any, line int) {
+// SetLineOnValue applies a property line to expanded values that do not have
+// their own object line, including each object nested inside arrays.
+func (s *sourceLineStore) SetLineOnValue(v any, line int) {
+	if s == nil {
+		return
+	}
 	switch val := v.(type) {
 	case map[string]any:
-		setSourceLineIfMissing(val, line)
+		s.SetLineIfMissing(val, line)
 	case []any:
 		for _, item := range val {
-			setSourceLineOnValue(item, line)
+			s.SetLineOnValue(item, line)
 		}
 	}
 }
 
-func sourcePropertyLine(v any, property string) int {
+// PropertyLine returns the line where a property key appeared on a JSON-LD
+// object, which becomes predicate provenance during RDF generation.
+func (s *sourceLineStore) PropertyLine(v any, property string) int {
+	if s == nil {
+		return 0
+	}
 	if m, ok := v.(map[string]any); ok {
-		if metadata := getSourceLineMetadata(m); metadata != nil {
+		if metadata := s.get(m); metadata != nil {
 			return metadata.properties[property]
 		}
 	}
 	return 0
 }
 
-func setSourcePropertyLine(m map[string]any, property string, line int) {
+// SetPropertyLine records a property's source line on an object map so expanded
+// properties can be traced back to their original JSON-LD keys.
+func (s *sourceLineStore) SetPropertyLine(m map[string]any, property string, line int) {
+	if s == nil {
+		return
+	}
 	if line > 0 {
-		metadata := ensureSourceLineMetadata(m)
+		metadata := s.ensure(m)
 		if metadata.properties == nil {
 			metadata.properties = make(map[string]int)
 		}
@@ -170,20 +220,8 @@ func setSourcePropertyLine(m map[string]any, property string, line int) {
 	}
 }
 
-// Return the length of the map without the special sourceLineMetadataKey
-// which tracks the source line of nodes in the JSON-LD document
-func lenWithoutProvMetadata(m map[string]any) int {
-	if _, ok := m[sourceLineMetadataKey]; ok {
-		return len(m) - 1
-	}
-	return len(m)
-}
-
-// Check if the key is the magic sourceLineMetadataKey value
-func isSourceLineMetadataKey(key string) bool {
-	return key == sourceLineMetadataKey
-}
-
+// sourceLineProvenance packages the tracked line numbers into the callback
+// payload emitted with generated RDF quads.
 func sourceLineProvenance(subjectLine int, predicateLine int, objectLine int, graphLine int) RDFQuadProvenance {
 	return RDFQuadProvenance{
 		SubjectLine:   subjectLine,
@@ -193,24 +231,39 @@ func sourceLineProvenance(subjectLine int, predicateLine int, objectLine int, gr
 	}
 }
 
+// applyProvCallback invokes the optional provenance callback only for valid RDF
+// quads, matching the point where tracked lines become observable to callers.
 func applyProvCallback(callback RDFQuadProvenanceCallback, quad *Quad, provenance RDFQuadProvenance) {
 	if callback != nil && quad != nil && quad.Valid() {
 		callback(quad, provenance)
 	}
 }
 
-func getSourceLineMetadata(m map[string]any) *sourceLineMetadata {
-	metadata, _ := m[sourceLineMetadataKey].(*sourceLineMetadata)
-	return metadata
+// get looks up metadata by map identity so source lines survive without adding
+// synthetic fields to user JSON-LD objects.
+func (s *sourceLineStore) get(m map[string]any) *sourceLineMetadata {
+	if s == nil {
+		return nil
+	}
+	return s.objects[mapIdentity(m)]
 }
 
-func ensureSourceLineMetadata(m map[string]any) *sourceLineMetadata {
-	if metadata := getSourceLineMetadata(m); metadata != nil {
+// ensure returns the metadata bucket for a map, creating it when a parser or
+// transformation step first discovers line information for that object.
+func (s *sourceLineStore) ensure(m map[string]any) *sourceLineMetadata {
+	if metadata := s.get(m); metadata != nil {
 		return metadata
 	}
 	metadata := &sourceLineMetadata{
 		properties: make(map[string]int),
 	}
-	m[sourceLineMetadataKey] = metadata
+	s.objects[mapIdentity(m)] = metadata
 	return metadata
+}
+
+// mapIdentity returns the map header pointer as a uintptr so metadata is mapped
+// by object identity, not object contents. That keeps distinct but equal maps
+// separate and avoids recomputing a content hash after expansion mutates them.
+func mapIdentity(m map[string]any) uintptr {
+	return reflect.ValueOf(m).Pointer()
 }
