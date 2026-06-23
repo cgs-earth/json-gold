@@ -661,6 +661,9 @@ func (api *JsonLdApi) expandObject(activeCtx *Context, activeProperty string, ex
 			}
 			// 7.4.12)
 			if expandedValue != nil {
+				if expandedProperty == "@type" {
+					api.sourceLines.SetLineOnValue(expandedValue, api.sourceLines.PropertyLine(elem, key))
+				}
 				resultMap[expandedProperty] = expandedValue
 				api.sourceLines.SetPropertyLine(resultMap, expandedProperty, api.sourceLines.PropertyLine(elem, key))
 			}

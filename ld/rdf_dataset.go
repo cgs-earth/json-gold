@@ -244,9 +244,10 @@ func (ds *RDFDataset) graphToRDF(graphName string, graph map[string]interface{},
 		subjectLine := sourceLines.Line(node)
 		for _, property := range GetOrderedKeys(node) {
 			predicateLine := sourceLines.PropertyLine(node, property)
+			isTypeProperty := property == "@type"
 			var values []interface{}
 			// 4.3.2.1)
-			if property == "@type" {
+			if isTypeProperty {
 				values = node["@type"].([]interface{})
 				property = RDFType
 			} else if IsKeyword(property) {
@@ -278,17 +279,24 @@ func (ds *RDFDataset) graphToRDF(graphName string, graph map[string]interface{},
 				predicate = NewIRI(property)
 			}
 
-			for _, item := range values {
+			for i, item := range values {
 				var object Node
 				object, triples = objectToRDF(item, issuer, graphName, triples, callback, sourceLines)
 				if object != nil {
 					quad := NewQuad(subject, predicate, object, graphName)
 					triples = append(triples, quad)
 					if callback != nil {
+						objectLine := sourceLines.Line(item)
+						if isTypeProperty {
+							objectLine = sourceLines.ArrayItemLine(values, i)
+							if objectLine == 0 {
+								objectLine = sourceLines.LineWithFallback(item, predicateLine)
+							}
+						}
 						applyProvCallback(callback, quad, sourceLineProvenance(
 							subjectLine,
 							predicateLine,
-							sourceLines.Line(item),
+							objectLine,
 							0,
 						))
 					}

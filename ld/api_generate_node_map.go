@@ -71,6 +71,11 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 				typeStr = issuer.GetId(typeStr)
 			}
 			newTypes[i] = typeStr
+			line := api.sourceLines.ArrayItemLine(types, i)
+			if line == 0 {
+				line = api.sourceLines.PropertyLine(elem, "@type")
+			}
+			api.sourceLines.SetArrayItemLine(newTypes, i, line)
 		}
 		if IsValue(element) {
 			elem["@type"] = newTypes[0]
@@ -140,6 +145,7 @@ func (api *JsonLdApi) GenerateNodeMap(element interface{}, graphMap map[string]i
 	if typeVal, hasType := elem["@type"]; hasType {
 		AddValue(node, "@type", typeVal, true, false, false, false)
 		api.sourceLines.SetPropertyLine(node, "@type", api.sourceLines.PropertyLine(elem, "@type"))
+		api.sourceLines.SetLineOnValue(node["@type"], api.sourceLines.PropertyLine(elem, "@type"))
 	}
 
 	if elemIdx, hasIndex := elem["@index"]; hasIndex {

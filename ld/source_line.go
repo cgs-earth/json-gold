@@ -35,6 +35,7 @@ type sourceLineMetadata struct {
 // existing JSON-LD map.
 type sourceLineStore struct {
 	objects map[uintptr]*sourceLineMetadata
+	arrays  map[uintptr]map[int]int
 }
 
 // newSourceLineStore creates the sidecar store used to keep source line data out
@@ -42,6 +43,7 @@ type sourceLineStore struct {
 func newSourceLineStore() *sourceLineStore {
 	return &sourceLineStore{
 		objects: make(map[uintptr]*sourceLineMetadata),
+		arrays:  make(map[uintptr]map[int]int),
 	}
 }
 
@@ -152,6 +154,32 @@ func (s *sourceLineStore) LineWithFallback(v any, fallback int) int {
 	return fallback
 }
 
+func (s *sourceLineStore) ArrayItemLine(a []any, index int) int {
+	if s == nil {
+		return 0
+	}
+	if lines := s.arrays[arrayIdentity(a)]; lines != nil {
+		return lines[index]
+	}
+	return 0
+}
+
+func (s *sourceLineStore) SetArrayItemLine(a []any, index int, line int) {
+	if s == nil || line <= 0 {
+		return
+	}
+	identity := arrayIdentity(a)
+	if identity == 0 {
+		return
+	}
+	lines := s.arrays[identity]
+	if lines == nil {
+		lines = make(map[int]int)
+		s.arrays[identity] = lines
+	}
+	lines[index] = line
+}
+
 // SetLine records the line where a JSON-LD object begins so later processing can
 // attribute RDF subjects or object values back to the original document.
 func (s *sourceLineStore) SetLine(m map[string]any, line int) {
@@ -185,7 +213,10 @@ func (s *sourceLineStore) SetLineOnValue(v any, line int) {
 	case map[string]any:
 		s.SetLineIfMissing(val, line)
 	case []any:
-		for _, item := range val {
+		for i, item := range val {
+			if s.Line(item) == 0 {
+				s.SetArrayItemLine(val, i, line)
+			}
 			s.SetLineOnValue(item, line)
 		}
 	}
@@ -266,4 +297,11 @@ func (s *sourceLineStore) ensure(m map[string]any) *sourceLineMetadata {
 // separate and avoids recomputing a content hash after expansion mutates them.
 func mapIdentity(m map[string]any) uintptr {
 	return reflect.ValueOf(m).Pointer()
+}
+
+func arrayIdentity(a []any) uintptr {
+	if len(a) == 0 {
+		return 0
+	}
+	return reflect.ValueOf(a).Pointer()
 }

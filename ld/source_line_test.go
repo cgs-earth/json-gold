@@ -83,6 +83,41 @@ func TestToRDFWithNoCallback(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestToRDFTypeValuesUseTypePropertyLine(t *testing.T) {
+	doc := `{
+  "@context": {
+    "@vocab": "https://schema.org/",
+    "schema": "https://schema.org/"
+  },
+  "@id": "https://example.org/item",
+  "@type": [
+    "schema:Dataset",
+    "PlaceEE"
+  ],
+  "schema:name": "Example"
+}`
+
+	provenance := make(map[string]RDFQuadProvenance)
+	opts := NewJsonLdOptions("")
+	opts.RDFQuadProvenanceCallback = func(quad *Quad, prov RDFQuadProvenance) {
+		provenance[makeStringFromQuad(quad)] = prov
+	}
+
+	proc := NewJsonLdProcessor()
+	result, err := proc.ToRDF(strings.NewReader(doc), opts)
+	require.NoError(t, err)
+
+	dataset := result.(*RDFDataset)
+	require.Len(t, dataset.Graphs["@default"], 3)
+
+	datasetTypeQuad := "https://example.org/item " + RDFType + " https://schema.org/Dataset"
+	placeTypeQuad := "https://example.org/item " + RDFType + " https://schema.org/PlaceEE"
+	require.Contains(t, provenance, datasetTypeQuad)
+	require.Contains(t, provenance, placeTypeQuad)
+	assert.Equal(t, 7, provenance[datasetTypeQuad].ObjectLine)
+	assert.Equal(t, 7, provenance[placeTypeQuad].ObjectLine)
+}
+
 func TestApplyLineMetadataDoesNotMutateJSONObjects(t *testing.T) {
 	doc := `{
   "@context": {
